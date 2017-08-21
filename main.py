@@ -234,7 +234,7 @@ if __name__ == '__main__':
     # Back up the reference to the exceptionhook
     sys._excepthook = sys.excepthook
     u = UpdateChecker()
-    u.check_update(version)
+    # u.check_update(version)
 
 
     def exception_hook(exctype, value, traceback):
@@ -255,7 +255,7 @@ if __name__ == '__main__':
 
     # check for tesseract
     try:
-        pytesseract.image_to_string(Image.open('pics/PP/3h.png'))
+        pytesseract.image_to_string(Image.open('pics/PP/3H.png'))
     except Exception as e:
         print(e)
         print(

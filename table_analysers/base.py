@@ -7,7 +7,8 @@ import logging
 import cv2  # opencv 3.0
 import numpy as np
 import pytesseract
-from PIL import Image, ImageFilter, ImageGrab
+from PIL import Image, ImageFilter
+import pyscreenshot as ImageGrab
 from configobj import ConfigObj
 
 from decisionmaker.genetic_algorithm import GeneticAlgorithm
