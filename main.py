@@ -8,6 +8,7 @@ import datetime
 import sys
 from PIL import Image
 from PyQt5 import QtWidgets, QtGui
+from autologging import logged
 
 from tools.mouse_mover import *
 from gui.gui_qt_ui import Ui_Pokerbot
@@ -21,6 +22,8 @@ from decisionmaker.decisionmaker import Decision
 version = 2.07
 
 
+@traced
+@logged
 class ThreadManager(threading.Thread):
     def __init__(self, threadID, name, counter, gui_signals):
         threading.Thread.__init__(self)
@@ -217,7 +220,8 @@ if __name__ == '__main__':
     er = logging.handlers.RotatingFileHandler('log/errors.log', maxBytes=2000000, backupCount=2)
     er.setLevel(logging.WARNING)
     ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.WARNING)
+    # ch.setLevel(logging.WARNING)
+    ch.setLevel(logging.DEBUG)
     fh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     fh2.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     er.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))

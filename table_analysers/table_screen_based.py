@@ -9,17 +9,24 @@ import numpy as np
 import pytesseract
 from PIL import Image, ImageFilter
 from copy import copy
+from autologging import logged, traced
+import logging
 
 from decisionmaker.montecarlo_python import MonteCarlo
 from tools.mouse_mover import MouseMoverTableBased
 from .base import Table
 
 
+@logged
+@traced
 class TableScreenBased(Table):
     def get_top_left_corner(self, p):
+        self.__log.setLevel(logging.DEBUG)
+
         self.current_strategy = p.current_strategy  # needed for mongo manager
         img = cv2.cvtColor(np.array(self.entireScreenPIL), cv2.COLOR_BGR2RGB)
-        count, points, bestfit, _ = self.find_template_on_screen(self.topLeftCorner, img, 0.01)
+        count, points, bestfit, _ = self.find_template_on_screen(
+                self.topLeftCorner, img, 0.01)
         try:
             count2, points2, bestfit2, _ = self.find_template_on_screen(self.topLeftCorner2, img, 0.01)
             if count2 == 1:
@@ -30,7 +37,7 @@ class TableScreenBased(Table):
 
         if count == 1:
             self.tlc = points[0]
-            self.logger.debug("Top left corner found")
+            self.__log.debug("Top left corner found")
             self.timeout_start = datetime.datetime.utcnow()
             self.mt_tm = time.time()
             return True
@@ -38,7 +45,7 @@ class TableScreenBased(Table):
 
             self.gui_signals.signal_status.emit(self.tbl + " not found yet")
             self.gui_signals.signal_progressbar_reset.emit()
-            self.logger.debug("Top left corner NOT found")
+            self.__log.debug("Top left corner NOT found")
             time.sleep(1)
             return False
 
@@ -53,18 +60,18 @@ class TableScreenBased(Table):
 
         if count > 0:
             self.gui_signals.signal_status.emit("Buttons found, cards: " + str(cards))
-            self.logger.info("Buttons Found, cards: " + str(cards))
+            self.__log.info("Buttons Found, cards: " + str(cards))
             return True
 
         else:
-            self.logger.debug("No buttons found")
+            self.__log.debug("No buttons found")
             return False
 
     def check_for_checkbutton(self):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_status.emit("Check for Check")
         self.gui_signals.signal_progressbar_increase.emit(5)
-        self.logger.debug("Checking for check button")
+        self.__log.debug("Checking for check button")
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
         img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
@@ -73,11 +80,11 @@ class TableScreenBased(Table):
         if count > 0:
             self.checkButton = True
             self.currentCallValue = 0.0
-            self.logger.debug("check button found")
+            self.__log.debug("check button found")
         else:
             self.checkButton = False
-            self.logger.debug("no check button found")
-        self.logger.debug("Check: " + str(self.checkButton))
+            self.__log.debug("no check button found")
+        self.__log.debug("Check: " + str(self.checkButton))
         return True
 
     def check_for_captcha(self, mouse):
@@ -100,14 +107,14 @@ class TableScreenBased(Table):
         #         keyword3 = 'pic'
         #         keyword4 = 'key'
         #         keyword5 = 'lete'
-        #         self.logger.debug("Recognised text: "+t.chatText)
+        #         self.__log.debug("Recognised text: "+t.chatText)
         #
         #         if ((t.chatText.find(keyword1) > 0) or (t.chatText.find(keyword2)
         #         > 0) or (
         #                     t.chatText.find(keyword3) > 0) or
         #                     (t.chatText.find(keyword4) > 0) or (
         #                     t.chatText.find(keyword5) > 0)):
-        #             self.logger.warning("Submitting Captcha")
+        #             self.__log.warning("Submitting Captcha")
         #             captchaIMG = self.crop_image(self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1_2'], self.tlc[1] + func_dict['y1_2'],
         #                             self.tlc[0] + func_dict['x2_2'], self.tlc[1] + func_dict['y2_2']))
         #             captchaIMG.save("pics/captcha.png")
@@ -115,9 +122,9 @@ class TableScreenBased(Table):
         #             time.sleep(0.5)
         #             t.captcha = solve_captcha("pics/captcha.png")
         #             mouse.enter_captcha(t.captcha)
-        #             self.logger.info("Entered captcha: "+str(t.captcha))
+        #             self.__log.info("Entered captcha: "+str(t.captcha))
         #     except:
-        #         self.logger.warning("CheckingForCaptcha Error")
+        #         self.__log.warning("CheckingForCaptcha Error")
         return True
 
     def check_for_imback(self, mouse):
@@ -138,39 +145,39 @@ class TableScreenBased(Table):
     def check_for_call(self):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_progressbar_increase.emit(5)
-        self.logger.debug("Check for Call")
+        self.__log.debug("Check for Call")
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
         img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
         count, points, bestfit, _ = self.find_template_on_screen(self.call, img, func_dict['tolerance'])
         if count > 0:
             self.callButton = True
-            self.logger.debug("Call button found")
+            self.__log.debug("Call button found")
         else:
             self.callButton = False
-            self.logger.info("Call button NOT found")
+            self.__log.info("Call button NOT found")
             pil_image.save("pics/debug_nocall.png")
         return True
 
     def check_for_betbutton(self):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_progressbar_increase.emit(5)
-        self.logger.debug("Check for betbutton")
+        self.__log.debug("Check for betbutton")
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
         img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
         count, points, bestfit, _ = self.find_template_on_screen(self.betbutton, img, func_dict['tolerance'])
         if count > 0:
             self.bet_button_found = True
-            self.logger.debug("Bet button found")
+            self.__log.debug("Bet button found")
         else:
             self.bet_button_found = False
-            self.logger.info("Bet button NOT found")
+            self.__log.info("Bet button NOT found")
         return True
 
     def check_for_allincall(self):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
-        self.logger.debug("Check for All in call button")
+        self.__log.debug("Check for All in call button")
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
         # Convert RGB to BGR
@@ -178,21 +185,21 @@ class TableScreenBased(Table):
         count, points, bestfit, _ = self.find_template_on_screen(self.allInCallButton, img, 0.01)
         if count > 0:
             self.allInCallButton = True
-            self.logger.debug("All in call button found")
+            self.__log.debug("All in call button found")
         else:
             self.allInCallButton = False
-            self.logger.debug("All in call button not found")
+            self.__log.debug("All in call button not found")
 
         if not self.bet_button_found:
             self.allInCallButton = True
-            self.logger.debug("Assume all in call because there is no bet button")
+            self.__log.debug("Assume all in call because there is no bet button")
 
         return True
 
     def get_table_cards(self, h):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_progressbar_increase.emit(5)
-        self.logger.debug("Get Table cards")
+        self.__log.debug("Get Table cards")
         self.cardsOnTable = []
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
@@ -221,13 +228,13 @@ class TableScreenBased(Table):
             self.gameStage = "River"
 
         if self.gameStage == '':
-            self.logger.critical("Table cards not recognised correctly: " + str(len(self.cardsOnTable)))
+            self.__log.critical("Table cards not recognised correctly: " + str(len(self.cardsOnTable)))
             self.gameStage = "River"
 
-        self.logger.info("---")
-        self.logger.info("Gamestage: " + self.gameStage)
-        self.logger.info("Cards on table: " + str(self.cardsOnTable))
-        self.logger.info("---")
+        self.__log.info("---")
+        self.__log.info("Gamestage: " + self.gameStage)
+        self.__log.info("Cards on table: " + str(self.cardsOnTable))
+        self.__log.info("---")
 
         self.max_X = 1 if self.gameStage != 'PreFlop' else 0.86
 
@@ -257,7 +264,7 @@ class TableScreenBased(Table):
             if found_card == '':
                 mouse_target = "Fold"
                 mouse.mouse_action(mouse_target, self.tlc)
-                self.logger.info("-------- FAST FOLD -------")
+                self.__log.info("-------- FAST FOLD -------")
                 return False
         return True
 
@@ -279,9 +286,8 @@ class TableScreenBased(Table):
                 dic[key] = min_val
 
                 if debugging:
-                    pass
-                    # dic = sorted(dic.items(), key=operator.itemgetter(1))
-                    # self.logger.debug(str(dic))
+                    dic = sorted(dic.items(), key=operator.itemgetter(1))
+                    self.__log.debug(str(dic))
 
         self.gui_signals.signal_progressbar_increase.emit(5)
         self.mycards = []
@@ -295,10 +301,10 @@ class TableScreenBased(Table):
         go_through_each_card(img, False)
 
         if len(self.mycards) == 2:
-            self.logger.info("My cards: " + str(self.mycards))
+            self.__log.info("My cards: " + str(self.mycards))
             return True
         else:
-            self.logger.debug("Did not find two player cards: " + str(self.mycards))
+            self.__log.debug("Did not find two player cards: " + str(self.mycards))
             go_through_each_card(img, True)
             return False
 
@@ -334,10 +340,10 @@ class TableScreenBased(Table):
                 try:
                     recognizedText = (pytesseract.image_to_string(pil_image, None, False, "-psm 6"))
                     recognizedText = re.sub(r'[\W+]', '', recognizedText)
-                    self.logger.debug("Player name: " + recognizedText)
+                    self.__log.debug("Player name: " + recognizedText)
                     self.other_players[i]['name'] = recognizedText
                 except Exception as e:
-                    self.logger.debug("Pyteseract error in player name recognition: " + str(e))
+                    self.__log.debug("Pyteseract error in player name recognition: " + str(e))
         return True
 
     def get_other_player_funds(self, p):
@@ -375,10 +381,10 @@ class TableScreenBased(Table):
                     if not str(value) == '':
                         value = re.findall(r'\d{1}\.\d{1,2}', str(value))[0]
                 except:
-                    self.logger.warning("Player pot regex problem: " + str(value))
+                    self.__log.warning("Player pot regex problem: " + str(value))
                     value = ''
                 value = float(value) if value != '' else ''
-                self.logger.debug("FINAL POT after regex: " + str(value))
+                self.__log.debug("FINAL POT after regex: " + str(value))
                 self.other_players[n]['pot'] = value
         return True
 
@@ -390,7 +396,7 @@ class TableScreenBased(Table):
         try:
             value = float(re.findall(r'\d{1}\.\d{1,2}', str(value))[0])
         except:
-            self.logger.debug("Assuming bot pot is 0")
+            self.__log.debug("Assuming bot pot is 0")
             value = 0
         self.bot_pot = value
         return value
@@ -406,7 +412,7 @@ class TableScreenBased(Table):
                                         self.tlc[0] + fd[2], self.tlc[1] + fd[3])
             img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
             count, points, bestfit, minvalue = self.find_template_on_screen(self.coveredCardHolder, img, 0.01)
-            self.logger.debug("Player status: " + str(i) + ": " + str(count))
+            self.__log.debug("Player status: " + str(i) + ": " + str(count))
             if count > 0:
                 self.covered_players += 1
                 self.other_players[i]['status'] = 1
@@ -425,9 +431,9 @@ class TableScreenBased(Table):
                 [v['status'] for v in self.other_players if v['abs_position'] >= self.dealer_position + 1 - 1])
         self.playersAhead = self.other_active_players - self.playersBehind
         self.isHeadsUp = True if self.other_active_players < 2 else False
-        self.logger.debug("Other players in the game: " + str(self.other_active_players))
-        self.logger.debug("Players behind: " + str(self.playersBehind))
-        self.logger.debug("Players ahead: " + str(self.playersAhead))
+        self.__log.debug("Other players in the game: " + str(self.other_active_players))
+        self.__log.debug("Players behind: " + str(self.playersBehind))
+        self.__log.debug("Players ahead: " + str(self.playersAhead))
 
         if h.round_number == 0:
             reference_pot = float(p.selected_strategy['bigBlind'])
@@ -450,7 +456,7 @@ class TableScreenBased(Table):
         else:
             self.other_player_has_initiative = False
 
-        self.logger.info("Other player has initiative: " + str(self.other_player_has_initiative))
+        self.__log.info("Other player has initiative: " + str(self.other_player_has_initiative))
 
         return True
 
@@ -472,7 +478,7 @@ class TableScreenBased(Table):
         try:
             point = points[0]
         except:
-            self.logger.debug("No dealer found")
+            self.__log.debug("No dealer found")
             return False
 
         self.position_utg_plus = ''
@@ -480,14 +486,14 @@ class TableScreenBased(Table):
             if point[0] > fd[0] and point[1] > fd[1] and point[0] < fd[2] and point[1] < fd[3]:
                 self.position_utg_plus = n
                 self.dealer_position = (9 - n) % 6  # 0 is myself, 1 is player to the left
-                self.logger.info('Bot position is UTG+' + str(self.position_utg_plus))  # 0 mean bot is UTG
+                self.__log.info('Bot position is UTG+' + str(self.position_utg_plus))  # 0 mean bot is UTG
 
         if self.position_utg_plus == '':
             self.position_utg_plus = 0
             self.dealer_position = 3
-            self.logger.error('Could not determine dealer position. Assuming UTG')
+            self.__log.error('Could not determine dealer position. Assuming UTG')
         else:
-            self.logger.info('Dealer position (0 is myself and 1 is next player): ' + str(self.dealer_position))
+            self.__log.info('Dealer position (0 is myself and 1 is next player): ' + str(self.dealer_position))
 
         self.big_blind_position_abs_all = (self.dealer_position + 2) % 6  # 0 is myself, 1 is player to my left
         self.big_blind_position_abs_op = self.big_blind_position_abs_all - 1
@@ -498,7 +504,7 @@ class TableScreenBased(Table):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_progressbar_increase.emit(5)
         self.gui_signals.signal_status.emit("Get Pot Value")
-        self.logger.debug("Get TotalPot value")
+        self.__log.debug("Get TotalPot value")
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
 
@@ -508,9 +514,9 @@ class TableScreenBased(Table):
             if not str(value) == '':
                 value = float(re.findall(r'\d{1,2}\.\d{1,2}', str(value))[0])
         except:
-            self.logger.warning("Total pot regex problem: " + str(value))
+            self.__log.warning("Total pot regex problem: " + str(value))
             value = ''
-            self.logger.warning("unable to get pot value")
+            self.__log.warning("unable to get pot value")
             self.gui_signals.signal_status.emit("Unable to get pot value")
             pil_image.save("pics/ErrPotValue.png")
             self.totalPotValue = h.previousPot
@@ -520,14 +526,14 @@ class TableScreenBased(Table):
         else:
             self.totalPotValue = value
 
-        self.logger.info("Final Total Pot Value: " + str(self.totalPotValue))
+        self.__log.info("Final Total Pot Value: " + str(self.totalPotValue))
         return True
 
     def get_round_pot_value(self, h):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_progressbar_increase.emit(2)
         self.gui_signals.signal_status.emit("Get round pot value")
-        self.logger.debug("Get round pot value")
+        self.__log.debug("Get round pot value")
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
 
@@ -537,9 +543,9 @@ class TableScreenBased(Table):
             if not str(value) == '':
                 value = float(re.findall(r'\d{1,2}\.\d{1,2}', str(value))[0])
         except:
-            self.logger.warning("Round pot regex problem: " + str(value))
+            self.__log.warning("Round pot regex problem: " + str(value))
             value = ''
-            self.logger.warning("unable to get round pot value")
+            self.__log.warning("unable to get round pot value")
             self.gui_signals.signal_status.emit("Unable to get round pot value")
             pil_image.save("pics/ErrRoundPotValue.png")
             self.round_pot_value = h.previous_round_pot_value
@@ -549,13 +555,13 @@ class TableScreenBased(Table):
         else:
             self.round_pot_value = value
 
-        self.logger.info("Final round pot Value: " + str(self.round_pot_value))
+        self.__log.info("Final round pot Value: " + str(self.round_pot_value))
         return True
 
     def get_my_funds(self, h, p):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_progressbar_increase.emit(5)
-        self.logger.debug("Get my funds")
+        self.__log.debug("Get my funds")
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
 
@@ -572,7 +578,7 @@ class TableScreenBased(Table):
         try:
             pil_image.save("pics/myFunds.png")
         except:
-            self.logger.info("Could not save myFunds.png")
+            self.__log.info("Could not save myFunds.png")
 
         self.myFunds = self.get_ocr_float(pil_image, 'MyFunds')
         if self.myFunds == '':
@@ -583,12 +589,12 @@ class TableScreenBased(Table):
         if self.myFunds == '':
             self.myFundsError = True
             self.myFunds = float(h.myFundsHistory[-1])
-            self.logger.info("myFunds not regognised!")
+            self.__log.info("myFunds not regognised!")
             self.gui_signals.signal_status.emit("Funds NOT recognised")
-            self.logger.warning("Funds NOT recognised. See pics/FundsError.png to see why.")
+            self.__log.warning("Funds NOT recognised. See pics/FundsError.png to see why.")
             self.entireScreenPIL.save("pics/FundsError.png")
             time.sleep(0.5)
-        self.logger.debug("Funds: " + str(self.myFunds))
+        self.__log.debug("Funds: " + str(self.myFunds))
         return True
 
     def get_current_call_value(self, p):
@@ -608,7 +614,7 @@ class TableScreenBased(Table):
             self.getCallButtonValueSuccess = True
         else:
             self.checkButton = True
-            self.logger.debug("Assuming check button as call value is zero")
+            self.__log.debug("Assuming check button as call value is zero")
             try:
                 pil_image.save("pics/ErrCallValue.png")
             except:
@@ -620,7 +626,7 @@ class TableScreenBased(Table):
         func_dict = self.coo[inspect.stack()[0][3]][self.tbl]
         self.gui_signals.signal_progressbar_increase.emit(5)
         self.gui_signals.signal_status.emit("Get Bet Value")
-        self.logger.debug("Get bet value")
+        self.__log.debug("Get bet value")
 
         pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
                                     self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
@@ -628,16 +634,16 @@ class TableScreenBased(Table):
         self.currentBetValue = self.get_ocr_float(pil_image, 'BetValue')
 
         if self.currentCallValue == '' and p.selected_strategy['pokerSite'][0:2] == "PS" and self.allInCallButton:
-            self.logger.warning("Taking call value from button on the right")
+            self.__log.warning("Taking call value from button on the right")
             self.currentCallValue = self.currentBetValue
             self.currentBetValue = 9999999
 
         if self.currentBetValue == '':
-            self.logger.warning("No bet value")
+            self.__log.warning("No bet value")
             self.currentBetValue = 9999999.0
 
         if self.currentCallValue == '':
-            self.logger.error("Call Value was empty")
+            self.__log.error("Call Value was empty")
             if p.selected_strategy['pokerSite'][0:2] == "PS" and self.allInCallButton:
                 self.currentCallValue = self.currentBetValue
                 self.currentBetValue = 9999999
@@ -658,8 +664,8 @@ class TableScreenBased(Table):
             self.BetValueReadError = True
             self.entireScreenPIL.save("pics/BetValueError.png")
 
-        self.logger.info("Final call value: " + str(self.currentCallValue))
-        self.logger.info("Final bet value: " + str(self.currentBetValue))
+        self.__log.info("Final call value: " + str(self.currentCallValue))
+        self.__log.info("Final bet value: " + str(self.currentBetValue))
         return True
 
     def get_lost_everything(self, h, t, p, gui_signals):
@@ -675,7 +681,7 @@ class TableScreenBased(Table):
             self.game_logger.mark_last_game(t, h, p)
             self.gui_signals.signal_status.emit("Everything is lost. Last game has been marked.")
             self.gui_signals.signal_progressbar_reset.emit()
-            self.logger.warning("Game over")
+            self.__log.warning("Game over")
             # user_input = input("Press Enter for exit ")
             # gui_signals.signal_curve_chart_update1.emit(h.histEquity, h.histMinCall, h.histMinBet, t.equity,
             #                                             t.minCall, t.minBet,
@@ -693,7 +699,7 @@ class TableScreenBased(Table):
     def get_new_hand(self, mouse, h, p):
         self.gui_signals.signal_progressbar_increase.emit(5)
         if h.previousCards != self.mycards:
-            self.logger.info("+++========================== NEW HAND ==========================+++")
+            self.__log.info("+++========================== NEW HAND ==========================+++")
             self.time_new_cards_recognised = datetime.datetime.utcnow()
             self.get_game_number_on_screen(h)
             self.get_my_funds(h, p)
@@ -724,7 +730,7 @@ class TableScreenBased(Table):
             mouse.move_mouse_away_from_buttons_jump()
             self.take_screenshot(False, p)
         else:
-            self.logger.info("Game number on screen: " + str(h.game_number_on_screen))
+            self.__log.info("Game number on screen: " + str(h.game_number_on_screen))
             self.get_my_funds(h, p)
 
         return True
@@ -756,7 +762,7 @@ class TableScreenBased(Table):
         try:
             h.game_number_on_screen = pytesseract.image_to_string(img_mod, None, False, "-psm 6")
         except:
-            self.logger.warning("Failed to get game number from screen")
+            self.__log.warning("Failed to get game number from screen")
             h.game_number_on_screen = ''
 
         return True
@@ -794,11 +800,11 @@ class TableScreenBased(Table):
         #             self.raise_advice = np.nan
         #         # self.betzise_advice = float(self.get_ocr_float(betsize_image, str(inspect.stack()[0][3])))
         #
-        #         self.logger.info("Fold Advice: {0}".format(self.fold_advice))
-        #         self.logger.info("Call Advice: {0}".format(self.call_advice))
-        #         self.logger.info("Raise Advice: {0}".format(self.raise_advice))
+        #         self.__log.info("Fold Advice: {0}".format(self.fold_advice))
+        #         self.__log.info("Call Advice: {0}".format(self.call_advice))
+        #         self.__log.info("Raise Advice: {0}".format(self.raise_advice))
         #         # logger.info("Betsize Advice: {0}".format(self.betzise_advice))
         #     else:
-        #         self.logger.warning("Could not identify snowie advice window. minValue: {0}".format(minvalue))
+        #         self.__log.warning("Could not identify snowie advice window. minValue: {0}".format(minvalue))
 
         return True

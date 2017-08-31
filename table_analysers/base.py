@@ -10,11 +10,14 @@ import pytesseract
 from PIL import Image, ImageFilter
 import pyscreenshot as ImageGrab
 from configobj import ConfigObj
+from autologging import logged, traced
 
 from decisionmaker.genetic_algorithm import GeneticAlgorithm
 from tools.vbox_manager import VirtualBoxController
 
 
+@logged
+@traced
 class Table(object):
     # General tools that are used to operate the pokerbot and are valid for all tables
     def __init__(self, p, gui_signals, game_logger, version):
@@ -22,8 +25,8 @@ class Table(object):
         self.ip = ''
         self.load_templates(p)
         self.load_coordinates()
-        self.logger = logging.getLogger('table')
-        self.logger.setLevel(logging.DEBUG)
+        # self.__log = logging.getLogger('table')
+        self.__log.setLevel(logging.DEBUG)
         self.gui_signals = gui_signals
         self.game_logger = game_logger
 
@@ -50,7 +53,7 @@ class Table(object):
                     # cv2.threshold(self.cardImages[x + y], 128, 255,
                     # cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                 else:
-                    self.logger.critical("Card template File not found: " + str(x) + str(y) + ".png")
+                    self.__log.critical("Card template File not found: " + str(x) + str(y) + ".png")
 
         name = "pics/" + self.tbl[0:2] + "/button.png"
         template = Image.open(name)
@@ -126,7 +129,8 @@ class Table(object):
 
         time.sleep(0.1)
         config = ConfigObj("config.ini")
-        control = config['control']
+        # control = config['control']
+        control = ''
         if control == 'Direct mouse control':
             self.entireScreenPIL = ImageGrab.grab()
 
@@ -134,9 +138,10 @@ class Table(object):
             try:
                 vb = VirtualBoxController()
                 self.entireScreenPIL = vb.get_screenshot_vbox()
-                self.logger.debug("Screenshot taken from virtual machine")
-            except:
-                self.logger.warning("No virtual machine found. Press SETUP to re initialize the VM controller")
+                self.__log.debug("Screenshot taken from virtual machine")
+            except Exception as e:
+                self.__log.warning("No virtual machine found. Press SETUP to re"
+                        "initialize the VM controller" + e)
                 # gui_signals.signal_open_setup.emit(p,L)
                 self.entireScreenPIL = ImageGrab.grab()
 
@@ -221,7 +226,7 @@ class Table(object):
         try:
             img_orig.save('pics/ocr_debug_' + name + '.png')
         except:
-            self.logger.warning("Coulnd't safe debugging png file for ocr")
+            self.__log.warning("Coulnd't safe debugging png file for ocr")
 
         basewidth = 300
         wpercent = (basewidth / float(img_orig.size[0]))
@@ -238,21 +243,21 @@ class Table(object):
         # try:
         #    lst.append(pytesseract.image_to_string(img_orig, none, false,"-psm 6"))
         # except exception as e:
-        #    self.logger.error(str(e))
+        #    self.__log.error(str(e))
 
         if force_method == 0:
             try:
                 lst.append(pytesseract.image_to_string(img_min, None, False, "-psm 6"))
             except Exception as e:
-                self.logger.warning(str(e))
+                self.__log.warning(str(e))
                 try:
                     self.entireScreenPIL.save('pics/err_debug_fullscreen.png')
                 except:
-                    self.logger.warning("Coulnd't safe debugging png file for ocr")
+                    self.__log.warning("Coulnd't safe debugging png file for ocr")
                     # try:
                     #    lst.append(pytesseract.image_to_string(img_med, None, False, "-psm 6"))
                     # except Exception as e:
-                    #    self.logger.error(str(e))
+                    #    self.__log.error(str(e))
 
         try:
             if force_method == 1 or fix_number(lst[0], force_method=0) == '':
@@ -261,28 +266,28 @@ class Table(object):
         except UnicodeDecodeError:
             pass
         except Exception as e:
-            self.logger.warning(str(e))
+            self.__log.warning(str(e))
             try:
                 self.entireScreenPIL.save('pics/err_debug_fullscreen.png')
             except:
-                self.logger.warning("Coulnd't safe debugging png file for ocr")
+                self.__log.warning("Coulnd't safe debugging png file for ocr")
 
         try:
             final_value = ''
             for i, j in enumerate(lst):
-                self.logger.debug("OCR of " + name + " method " + str(i) + ": " + str(j))
+                self.__log.debug("OCR of " + name + " method " + str(i) + ": " + str(j))
                 lst[i] = fix_number(lst[i], force_method) if lst[i] != '' else lst[i]
                 final_value = lst[i] if final_value == '' else final_value
 
-            self.logger.info(name + " FINAL VALUE: " + str(final_value))
+            self.__log.info(name + " FINAL VALUE: " + str(final_value))
             if final_value == '':
                 return ''
             else:
                 return float(final_value)
 
         except Exception as e:
-            self.logger.warning("Pytesseract Error in recognising " + name)
-            self.logger.warning(str(e))
+            self.__log.warning("Pytesseract Error in recognising " + name)
+            self.__log.warning(str(e))
             try:
                 self.entireScreenPIL.save('pics/err_debug_fullscreen.png')
             except:
@@ -301,22 +306,22 @@ class Table(object):
 
         winnings_per_bb_100 = total_winnings / p.selected_strategy['bigBlind'] / n * 100 if n > 0 else 0
 
-        self.logger.info("Total Strategy winnings: %s", total_winnings)
-        self.logger.info("Winnings in BB per 100 hands: %s", np.round(winnings_per_bb_100,2))
+        self.__log.info("Total Strategy winnings: %s", total_winnings)
+        self.__log.info("Winnings in BB per 100 hands: %s", np.round(winnings_per_bb_100,2))
         self.gui_signals.signal_label_number_update.emit('winnings', str(np.round(winnings_per_bb_100, 2)))
 
-        self.logger.info("Game #" + str(n) + " - Last " + str(lg) + ": $" + str(f))
+        self.__log.info("Game #" + str(n) + " - Last " + str(lg) + ": $" + str(f))
 
         if n % int(p.selected_strategy['strategyIterationGames']) == 0 and f < float(
                 p.selected_strategy['minimumLossForIteration']):
             self.gui_signals.signal_status.emit("***Improving current strategy***")
-            self.logger.info("***Improving current strategy***")
+            self.__log.info("***Improving current strategy***")
             # winsound.Beep(500, 100)
             GeneticAlgorithm(True, self.game_logger)
             p.read_strategy()
         else:
             pass
-            # self.logger.debug("Criteria not met for running genetic algorithm. Recommendation would be as follows:")
+            # self.__log.debug("Criteria not met for running genetic algorithm. Recommendation would be as follows:")
             # if n % 50 == 0: GeneticAlgorithm(False, logger, L)
 
     def crop_image(self, original, left, top, right, bottom):
@@ -342,7 +347,7 @@ class Table(object):
         for n in range(5):  # n is absolute position of other player, 0 is player after bot
             i = (
                     self.dealer_position + n + 3 - 2) % 5  # less myself as 0 is now first other player to my left and no longer myself
-            self.logger.debug("Go through pots to find raiser abs: {0} {1}".format(i, self.other_players[i]['pot']))
+            self.__log.debug("Go through pots to find raiser abs: {0} {1}".format(i, self.other_players[i]['pot']))
             if self.other_players[i]['pot'] != '':  # check if not empty (otherwise can't convert string)
                 if self.other_players[i]['pot'] > reference_pot:
                     # reference pot is bb for first round and bot for second round
@@ -359,11 +364,11 @@ class Table(object):
 
         first_possible_caller = int(self.big_blind_position_abs_op + 1) if np.isnan(highest_raiser) else int(
             highest_raiser + 1)
-        self.logger.debug("First possible potential caller is: " + str(first_possible_caller))
+        self.__log.debug("First possible potential caller is: " + str(first_possible_caller))
 
         # get first caller after raise in preflop
         for n in range(first_possible_caller, 5):  # n is absolute position of other player, 0 is player after bot
-            self.logger.debug(
+            self.__log.debug(
                 "Go through pots to find caller abs: " + str(n) + ": " + str(self.other_players[n]['pot']))
             if self.other_players[n]['pot'] != '':  # check if not empty (otherwise can't convert string)
                 if (self.other_players[n]['pot'] == float(
@@ -390,12 +395,12 @@ class Table(object):
                     second_raiser_utg = self.get_utg_from_abs_pos(second_raiser, self.dealer_position)
                     break
 
-        self.logger.debug("First raiser abs: " + str(first_raiser))
-        self.logger.info("First raiser utg+" + str(first_raiser_utg))
-        self.logger.debug("Second raiser abs: " + str(second_raiser))
-        self.logger.info("Highest raiser abs: " + str(highest_raiser))
-        self.logger.debug("First caller abs: " + str(first_caller))
-        self.logger.info("First caller utg+" + str(first_caller_utg))
+        self.__log.debug("First raiser abs: " + str(first_raiser))
+        self.__log.info("First raiser utg+" + str(first_raiser_utg))
+        self.__log.debug("Second raiser abs: " + str(second_raiser))
+        self.__log.info("Highest raiser abs: " + str(highest_raiser))
+        self.__log.debug("First caller abs: " + str(first_caller))
+        self.__log.info("First caller utg+" + str(first_caller_utg))
 
         return first_raiser, second_raiser, first_caller, first_raiser_utg, second_raiser_utg, first_caller_utg
 
