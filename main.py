@@ -128,33 +128,33 @@ class ThreadManager(threading.Thread):
                 mouse = MouseMoverTableBased(p.selected_strategy['pokerSite'])
                 mouse.move_mouse_away_from_buttons_jump
 
-                ready = t.take_screenshot(True, p) and \
-                        t.get_top_left_corner(p) and \
-                        t.check_for_captcha(mouse) and \
-                        t.get_lost_everything(h, t, p, gui_signals) and \
-                        t.check_for_imback(mouse) and \
-                        t.get_my_cards(h) and \
-                        t.get_new_hand(mouse, h, p) and \
-                        t.get_table_cards(h) and \
-                        t.upload_collusion_wrapper(p, h) and \
-                        t.get_dealer_position() and \
-                        t.get_snowie_advice(p, h) and \
-                        t.check_fast_fold(h, p, mouse) and \
-                        t.check_for_button() and \
-                        t.get_round_number(h) and \
-                        t.init_get_other_players_info() and \
-                        t.get_other_player_names(p) and \
-                        t.get_other_player_funds(p) and \
-                        t.get_other_player_pots() and \
-                        t.get_total_pot_value(h) and \
-                        t.get_round_pot_value(h) and \
-                        t.check_for_checkbutton() and \
-                        t.get_other_player_status(p, h) and \
-                        t.check_for_call() and \
-                        t.check_for_betbutton() and \
-                        t.check_for_allincall() and \
-                        t.get_current_call_value(p) and \
-                        t.get_current_bet_value(p)
+                ready = (t.take_screenshot(True, p) and
+                        t.get_top_left_corner(p) and
+                        t.check_for_captcha(mouse) and
+                        t.get_lost_everything(h, t, p, gui_signals) and
+                        t.check_for_imback(mouse) and
+                        t.get_total_pot_value(h) and
+                        t.get_table_cards(h) and
+                        t.init_get_other_players_info() and
+                        t.get_other_player_names(p) and
+                        t.get_other_player_funds(p) and
+                        t.get_other_player_pots() and
+                        t.get_my_cards(h) and
+                        t.get_new_hand(mouse, h, p) and
+                        t.upload_collusion_wrapper(p, h) and
+                        t.get_dealer_position() and
+                        t.get_snowie_advice(p, h) and
+                        # t.check_fast_fold(h, p, mouse) and
+                        # t.check_for_button() and
+                        t.get_round_number(h) and
+                        t.get_round_pot_value(h) and
+                        t.check_for_checkbutton() and
+                        t.get_other_player_status(p, h) and
+                        t.check_for_call() and
+                        t.check_for_betbutton() and
+                        t.check_for_allincall() and
+                        t.get_current_call_value(p) and
+                        t.get_current_bet_value(p))
 
             if not self.gui_signals.pause_thread:
                 config = ConfigObj("config.ini")
@@ -255,7 +255,7 @@ if __name__ == '__main__':
 
 
     # Set the exception hook to our wrapping function
-    sys.__excepthook__ = exception_hook
+    # sys.__excepthook__ = exception_hook
 
     # check for tesseract
     try:

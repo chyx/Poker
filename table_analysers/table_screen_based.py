@@ -45,7 +45,7 @@ class TableScreenBased(Table):
 
             self.gui_signals.signal_status.emit(self.tbl + " not found yet")
             self.gui_signals.signal_progressbar_reset.emit()
-            self.__log.debug("Top left corner NOT found")
+            self.__log.error("Top left corner NOT found")
             time.sleep(1)
             return False
 
@@ -72,8 +72,12 @@ class TableScreenBased(Table):
         self.gui_signals.signal_status.emit("Check for Check")
         self.gui_signals.signal_progressbar_increase.emit(5)
         self.__log.debug("Checking for check button")
-        pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + func_dict['x1'], self.tlc[1] + func_dict['y1'],
-                                    self.tlc[0] + func_dict['x2'], self.tlc[1] + func_dict['y2'])
+        pil_image = self.crop_image(
+                self.entireScreenPIL,
+                self.tlc[0] + func_dict['x1'],
+                self.tlc[1] + func_dict['y1'],
+                self.tlc[0] + func_dict['x2'],
+                self.tlc[1] + func_dict['y2'])
         img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_BGR2RGB)
         count, points, bestfit, minval = self.find_template_on_screen(self.check, img, func_dict['tolerance'])
 
@@ -286,8 +290,9 @@ class TableScreenBased(Table):
                 dic[key] = min_val
 
                 if debugging:
-                    dic = sorted(dic.items(), key=operator.itemgetter(1))
-                    self.__log.debug(str(dic))
+                    # dic = sorted(dic.items(), key=operator.itemgetter(1))
+                    # self.__log.debug(str(dic))
+                    pass
 
         self.gui_signals.signal_progressbar_increase.emit(5)
         self.mycards = []
@@ -355,7 +360,8 @@ class TableScreenBased(Table):
                 pil_image = self.crop_image(self.entireScreenPIL, self.tlc[0] + fd[0], self.tlc[1] + fd[1],
                                             self.tlc[0] + fd[2], self.tlc[1] + fd[3])
                 # pil_image.show()
-                value = self.get_ocr_float(pil_image, str(inspect.stack()[0][3]))
+                value = self.get_ocr_float(pil_image,
+                        str(inspect.stack()[0][3]) + ' player ' + str(i))
                 value = float(value) if value != '' else ''
                 self.other_players[i]['funds'] = value
         return True

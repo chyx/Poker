@@ -48,7 +48,6 @@ class Table(object):
 
                     self.cardImages[x + y.upper()] = cv2.cvtColor(np.array(self.img[x + y.upper()]), cv2.COLOR_BGR2RGB)
 
-
                     # (thresh, self.cardImages[x + y]) =
                     # cv2.threshold(self.cardImages[x + y], 128, 255,
                     # cv2.THRESH_BINARY | cv2.THRESH_OTSU)
@@ -192,7 +191,7 @@ class Table(object):
         def fix_number(t, force_method):
             t = t.replace("I", "1").replace("Â°lo", "").replace("O", "0").replace("o", "0") \
                 .replace("-", ".").replace("D", "0").replace("I", "1").replace("_", ".").replace("-", ".") \
-                .replace("B", "8").replace("..", ".")
+                .replace("B", "8").replace("..", ".").replace(",", "")
             t = re.sub("[^0123456789\.]", "", t)
             try:
                 if t[0] == ".": t = t[1:]
@@ -212,12 +211,12 @@ class Table(object):
                 pass
             if force_method == 1:
                 try:
-                    t = re.findall(r'\d{1,3}\.\d{1,2}', str(t))[0]
+                    t = re.findall(r'\d{1,7}\.\d{1,2}', str(t))[0]
                 except:
                     t = ''
                 if t == '':
                     try:
-                        t = re.findall(r'\d{1,3}', str(t))[0]
+                        t = re.findall(r'\d{1,7}', str(t))[0]
                     except:
                         t = ''
 
@@ -239,6 +238,9 @@ class Table(object):
         # img_med = img_resized.filter(ImageFilter.MedianFilter)
         img_mod = img_resized.filter(ImageFilter.ModeFilter).filter(ImageFilter.SHARPEN)
 
+        img_min.save('pics/ocr_debug_' + name + '_min.png')
+        img_mod.save('pics/ocr_debug_' + name + '_mod.png')
+
         lst = []
         # try:
         #    lst.append(pytesseract.image_to_string(img_orig, none, false,"-psm 6"))
@@ -247,22 +249,23 @@ class Table(object):
 
         if force_method == 0:
             try:
-                lst.append(pytesseract.image_to_string(img_min, None, False, "-psm 6"))
+                # lst.append(pytesseract.image_to_string(img_min, None, False, "-psm 6"))
+                lst.append(pytesseract.image_to_string(img_min))
+                self.__log.debug('Number for ' + name + ' was: '+ lst[0])
             except Exception as e:
                 self.__log.warning(str(e))
                 try:
                     self.entireScreenPIL.save('pics/err_debug_fullscreen.png')
                 except:
                     self.__log.warning("Coulnd't safe debugging png file for ocr")
-                    # try:
-                    #    lst.append(pytesseract.image_to_string(img_med, None, False, "-psm 6"))
-                    # except Exception as e:
-                    #    self.__log.error(str(e))
 
         try:
             if force_method == 1 or fix_number(lst[0], force_method=0) == '':
-                lst.append(pytesseract.image_to_string(img_mod, None, False, "-psm 6"))
-                lst.append(pytesseract.image_to_string(img_min, None, False, "-psm 6"))
+                # lst.append(pytesseract.image_to_string(img_mod, None, False, "-psm 6"))
+                # lst.append(pytesseract.image_to_string(img_min, None, False, "-psm 6"))
+                lst.append(pytesseract.image_to_string(img_mod))
+                lst.append(pytesseract.image_to_string(img_min))
+
         except UnicodeDecodeError:
             pass
         except Exception as e:

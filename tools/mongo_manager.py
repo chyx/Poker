@@ -68,15 +68,19 @@ class UpdateChecker():
 
 class StrategyHandler(object):
     def __init__(self):
-        self.mongoclient = MongoClient('mongodb://guest:donald@52.201.173.151:27017/POKER')
-        self.mongodb = self.mongoclient.POKER
+        # self.mongoclient = MongoClient('mongodb://guest:donald@52.201.173.151:27017/POKER')
+        # self.mongodb = self.mongoclient.POKER
+        pass
 
     def get_playable_strategy_list(self):
-        l = list(self.mongodb.strategies.distinct("Strategy"))[::-1]
-        return l
+        # l = list(self.mongodb.strategies.distinct("Strategy"))[::-1]
+        # return l
+        return ['PS2']
 
     def check_defaults(self):
-        if not 'initialFunds2' in self.selected_strategy: self.selected_strategy['initialFunds2'] =  self.selected_strategy['initialFunds']
+        if not 'initialFunds2' in self.selected_strategy:
+            # self.selected_strategy['initialFunds2'] = self.selected_strategy['initialFunds']
+            self.selected_strategy['initialFunds2'] = 0
         if not 'use_relative_equity' in self.selected_strategy: self.selected_strategy['use_relative_equity'] = 0
         if not 'use_pot_multiples' in self.selected_strategy: self.selected_strategy['use_pot_multiples'] = 0
         if not 'opponent_raised_without_initiative_flop' in self.selected_strategy: self.selected_strategy['opponent_raised_without_initiative_flop'] = 1
@@ -130,17 +134,26 @@ class StrategyHandler(object):
         if not 'range_multiple_players' in self.selected_strategy: self.selected_strategy[
             'range_multiple_players'] = 0.2
         if not 'minimum_bet_size' in self.selected_strategy: self.selected_strategy['minimum_bet_size'] = 3
+        if not 'pokerSite' in self.selected_strategy:
+            self.selected_strategy['pokerSite'] = 'PS2'
+        # todo: fix the value!
+        self.selected_strategy['bigBlind'] = 100
+        self.selected_strategy['smallBlind'] = 50
+        self.selected_strategy['considerLastGames'] = 1
+        self.selected_strategy['strategyIterationGames'] = 10
+        self.selected_strategy['gather_player_names'] = 1
 
     def read_strategy(self, strategy_override=''):
         config = ConfigObj("config.ini")
         last_strategy = (config['last_strategy'])
         self.current_strategy = last_strategy if strategy_override == '' else strategy_override
-        try:
-            cursor = self.mongodb.strategies.find({'Strategy': self.current_strategy})
-            self.selected_strategy = cursor.next()
-        except:
-            cursor = self.mongodb.strategies.find({'Strategy': "Default"})
-            self.selected_strategy = cursor.next()
+        # try:
+        #     cursor = self.mongodb.strategies.find({'Strategy': self.current_strategy})
+        #     self.selected_strategy = cursor.next()
+        # except:
+        #     cursor = self.mongodb.strategies.find({'Strategy': "Default"})
+        #     self.selected_strategy = cursor.next()
+        self.selected_strategy = {}
         self.check_defaults()
         return self.selected_strategy
 

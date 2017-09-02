@@ -1,15 +1,18 @@
+import unittest
 from unittest import TestCase
 import numpy as np
 from . import init_table
 
+
 class TestTableScreenBased(TestCase):
+
     def test_game_number(self):
         t, p, gui_signals, h, logger = init_table('tests/screenshots/1773793_PreFlop_0.png')
         t.get_game_number_on_screen(h)
         self.assertEqual(h.game_number_on_screen,"15,547,039,153")
 
     def test_other_players1(self):
-        t, p, gui_signals, h, logger=init_table('tests/screenshots/1773793_PreFlop_0.png')
+        t, p, gui_signals, h, logger=init_table('log/screenshots/860810309_Flop_0.png')
 
         self.assertEqual(t.position_utg_plus,0)
         self.assertEqual(t.dealer_position, 3)
@@ -23,7 +26,8 @@ class TestTableScreenBased(TestCase):
         self.assertEqual(t.other_players[4]['utg_position'], 5)
 
     def test_other_players2(self):
-        t, p, gui_signals, h, logger=init_table('tests/screenshots/751235173_PreFlop_0.png')
+        t, p, gui_signals, h, logger=init_table('log/screenshots/860810309_Flop_0.png')
+        # t, p, gui_signals, h, logger=init_table('tests/screenshots/751235173_PreFlop_0.png')
 
         self.assertEqual(t.position_utg_plus, 5)
         self.assertEqual(t.dealer_position, 4)
@@ -167,3 +171,6 @@ class TestTableScreenBased(TestCase):
         self.assertEqual(t.currentCallValue,0.34)
         self.assertEqual(t.currentBetValue, 0.60)
         self.assertEqual(t.myFunds,4.98)
+
+if __name__ == '__main__':
+    unittest.main()
