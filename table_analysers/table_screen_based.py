@@ -12,14 +12,15 @@ from copy import copy
 
 from decisionmaker.montecarlo_python import MonteCarlo
 from tools.mouse_mover import MouseMoverTableBased
-from .base import Table
+from table_analysers.base import Table
 
 
 class TableScreenBased(Table):
     def get_top_left_corner(self, p):
         self.current_strategy = p.current_strategy  # needed for mongo manager
         img = cv2.cvtColor(np.array(self.entireScreenPIL), cv2.COLOR_BGR2RGB)
-        count, points, bestfit, _ = self.find_template_on_screen(self.topLeftCorner, img, 0.01)
+        count, points, bestfit, _ = self.find_template_on_screen(
+                self.topLeftCorner, img, 0.05)
         try:
             count2, points2, bestfit2, _ = self.find_template_on_screen(self.topLeftCorner2, img, 0.01)
             if count2 == 1:
@@ -331,6 +332,7 @@ class TableScreenBased(Table):
                 wpercent = (basewidth / float(pil_image.size[0]))
                 hsize = int((float(pil_image.size[1]) * float(wpercent)))
                 pil_image = pil_image.resize((basewidth, hsize), Image.ANTIALIAS)
+                pil_image.save('pics/player_name' + str(i) + '.png')
                 try:
                     recognizedText = (pytesseract.image_to_string(pil_image, None, False, "-psm 6"))
                     recognizedText = re.sub(r'[\W+]', '', recognizedText)
@@ -692,10 +694,11 @@ class TableScreenBased(Table):
 
     def get_new_hand(self, mouse, h, p):
         self.gui_signals.signal_progressbar_increase.emit(5)
-        if h.previousCards != self.mycards:
+        if not self.mycards or h.previousCards != self.mycards:
             self.logger.info("+++========================== NEW HAND ==========================+++")
             self.time_new_cards_recognised = datetime.datetime.utcnow()
             self.get_game_number_on_screen(h)
+
             self.get_my_funds(h, p)
 
             h.lastGameID = str(h.GameID)
@@ -732,7 +735,8 @@ class TableScreenBased(Table):
     def upload_collusion_wrapper(self, p, h):
         if not (h.GameID, self.gameStage) in h.uploader:
             h.uploader[(h.GameID, self.gameStage)] = True
-            self.game_logger.upload_collusion_data(h.game_number_on_screen, self.mycards, p, self.gameStage)
+# chyx
+#            self.game_logger.upload_collusion_data(h.game_number_on_screen, self.mycards, p, self.gameStage)
         return True
 
     def get_game_number_on_screen(self, h):

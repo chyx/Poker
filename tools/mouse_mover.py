@@ -1,7 +1,7 @@
 import logging
 import random
 import logging
-
+import sys
 import numpy as np
 from configobj import ConfigObj
 
@@ -14,6 +14,11 @@ class MouseMover(VirtualBoxController):
     def __init__(self, vbox_mode):
         self.logger = logging.getLogger('mouse')
         self.logger.setLevel(logging.DEBUG)
+
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(handler)
+
         if vbox_mode:
             super().__init__()
         self.mouse=pymouse.PyMouse()

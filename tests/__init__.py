@@ -1,4 +1,6 @@
 import inspect
+import numpy as np
+import cv2  # opencv 3.0
 import logging
 import os
 import sys
@@ -6,10 +8,12 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 from PIL import Image
+from table_analysers.table_screen_based import TableScreenBased
 
 from tools.mongo_manager import GameLogger
 from tools.mongo_manager import StrategyHandler
 from tools.mongo_manager import UpdateChecker
+from decisionmaker.current_hand_memory import History
 
 from decisionmaker.current_hand_memory import History, CurrentHandPreflopState
 
@@ -19,21 +23,31 @@ sys.path.insert(0,parentdir)
 import main
 
 
+strategy='PS_alex'
+file = 'screenshot_vbox.png'
+file = 'test.png'
+round_number = 0
 def init_table(file,round_number=0, strategy='Pokemon4'):
     LOG_FILENAME = 'testing.log'
     logger = logging.getLogger('tester')
     gui_signals = MagicMock()
     p = StrategyHandler()
     p.read_strategy(strategy_override=strategy)
-    h = main.History()
+    h = History()
     u = UpdateChecker()
     cursor = u.mongodb.internal.find()
     c = cursor.next()
     preflop_url = c['preflop_url']
+    preflop_url = 'decisionmaker/preflop.xlsx'
     h.preflop_sheet = pd.read_excel(preflop_url, sheetname=None)
     game_logger = GameLogger()
-    t = main.TableScreenBased(p,gui_signals,game_logger,0.0)
+
+    t = TableScreenBased(p,gui_signals,game_logger,0.0)
     t.entireScreenPIL = Image.open(file)
+
+    img = cv2.cvtColor(np.array(t.entireScreenPIL), cv2.COLOR_BGR2RGB)
+    t.find_template_on_screen(t.topLeftCorner, img, 0.05)
+
     t.get_top_left_corner(p)
     t.get_dealer_position()
     t.get_my_funds(h,p)

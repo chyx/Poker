@@ -31,6 +31,10 @@ class ThreadManager(threading.Thread):
         self.logger = logging.getLogger('main')
         self.logger.setLevel(logging.DEBUG)
 
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(handler)
+
         self.game_logger = GameLogger()
 
     def update_most_gui_items(self, preflop_state, p, m, t, d, h, gui_signals):
@@ -99,7 +103,9 @@ class ThreadManager(threading.Thread):
 
     def run(self):
         h = History()
-        preflop_url, preflop_url_backup = u.get_preflop_sheet_url()
+        # preflop_url, preflop_url_backup = u.get_preflop_sheet_url()
+        preflop_url, preflop_url_backup = '', 'decisionmaker/preflop.xlsx'
+        # 'https://www.dropbox.com/s/j7o2fje3u6vsu75/preflop.xlsx?dl=1'
         try:
             h.preflop_sheet = pd.read_excel(preflop_url, sheetname=None)
         except:
@@ -125,34 +131,37 @@ class ThreadManager(threading.Thread):
                 mouse = MouseMoverTableBased(p.selected_strategy['pokerSite'])
                 mouse.move_mouse_away_from_buttons_jump
 
-                ready = t.take_screenshot(True, p) and \
-                        t.get_top_left_corner(p) and \
-                        t.check_for_captcha(mouse) and \
-                        t.get_lost_everything(h, t, p, gui_signals) and \
-                        t.check_for_imback(mouse) and \
-                        t.get_my_cards(h) and \
-                        t.get_new_hand(mouse, h, p) and \
-                        t.get_table_cards(h) and \
-                        t.upload_collusion_wrapper(p, h) and \
-                        t.get_dealer_position() and \
-                        t.get_snowie_advice(p, h) and \
-                        t.check_fast_fold(h, p, mouse) and \
-                        t.check_for_button() and \
-                        t.get_round_number(h) and \
-                        t.init_get_other_players_info() and \
-                        t.get_other_player_names(p) and \
-                        t.get_other_player_funds(p) and \
-                        t.get_other_player_pots() and \
-                        t.get_total_pot_value(h) and \
-                        t.get_round_pot_value(h) and \
-                        t.check_for_checkbutton() and \
-                        t.get_other_player_status(p, h) and \
-                        t.check_for_call() and \
-                        t.check_for_betbutton() and \
-                        t.check_for_allincall() and \
-                        t.get_current_call_value(p) and \
-                        t.get_current_bet_value(p)
+                t.mycards = []
+                ready = (t.take_screenshot(True, p) and 
+                        t.get_top_left_corner(p) and 
+                        t.check_for_captcha(mouse) and 
+                        t.get_lost_everything(h, t, p, gui_signals) and 
+                        t.check_for_imback(mouse) and 
+                        t.get_my_cards(h) and 
+                        t.get_new_hand(mouse, h, p) and 
+                        t.get_table_cards(h) and 
+                        t.upload_collusion_wrapper(p, h) and 
+                        t.get_dealer_position() and 
+                        t.get_snowie_advice(p, h) and 
+                        t.check_fast_fold(h, p, mouse) and 
+                        t.check_for_button() and 
+                        t.get_round_number(h) and 
+                        t.init_get_other_players_info() and 
+                        t.get_other_player_names(p) and 
+                        t.get_other_player_funds(p) and 
+                        t.get_other_player_pots() and 
+                        t.get_total_pot_value(h) and 
+                        t.get_round_pot_value(h) and 
+                        t.check_for_checkbutton() and 
+                        t.get_other_player_status(p, h) and 
+                        t.check_for_call() and 
+                        t.check_for_betbutton() and 
+                        t.check_for_allincall() and 
+                        t.get_current_call_value(p) and 
+                        t.get_current_bet_value(p) and
+                        True)
 
+            print("!!!!!!!!!ready!!!!!!!!!!")
             if not self.gui_signals.pause_thread:
                 config = ConfigObj("config.ini")
                 m = run_montecarlo_wrapper(p, self.gui_signals, config, ui, t, self.game_logger, preflop_state, h)
@@ -251,7 +260,8 @@ if __name__ == '__main__':
 
 
     # Set the exception hook to our wrapping function
-    sys.__excepthook__ = exception_hook
+# todo(chyx)
+    # sys.__excepthook__ = exception_hook
 
     # check for tesseract
     try:

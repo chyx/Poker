@@ -1,4 +1,7 @@
+import sys
+sys.path.append('/usr/lib/virtualbox/')
 import virtualbox
+import subprocess
 from PIL import Image
 import time
 from configobj import ConfigObj
@@ -9,6 +12,12 @@ import logging
 class VirtualBoxController(virtualbox.library.IMouse):
     def __init__(self):
         self.logger = logging.getLogger('vm_control')
+        # self.logger = logging.getLogger()
+
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.DEBUG)
+        # self.logger.addHandler(handler)
+
         self.logger.setLevel(logging.DEBUG)
         try:
             self.vbox = virtualbox.VirtualBox()
@@ -28,7 +37,8 @@ class VirtualBoxController(virtualbox.library.IMouse):
     def start_vm(self):
         try:
             if self.control_name != 'Direct mouse control':
-                self.vm = self.vbox.find_machine(self.control_name)
+                # self.vm = self.vbox.find_machine(self.control_name)
+                self.vm = self.vbox.machines[0]
                 self.session = self.vm.create_session()
         except Exception as e:
             self.logger.warning(str(e))
@@ -39,11 +49,7 @@ class VirtualBoxController(virtualbox.library.IMouse):
 
     def get_screenshot_vbox(self):
         h, w, _, _, _, _ = self.session.console.display.get_screen_resolution(0)
-        png = self.session.console.display.take_screen_shot_to_array(0, h, w, virtualbox.library.BitmapFormat.png)
-        open('screenshot_vbox.png', 'wb').write(png)
-        # image=Image.fromarray(png)
-        # image.show()
-        time.sleep(0.5)
+        subprocess.call(["VBoxManage", "controlvm", "poker", "screenshotpng", "screenshot_vbox.png"])
         return Image.open('screenshot_vbox.png')
 
     def mouse_move_vbox(self, x, y, dz=0, dw=0):
@@ -55,9 +61,8 @@ class VirtualBoxController(virtualbox.library.IMouse):
         self.session.console.mouse.put_mouse_event_absolute(x, y, dz, dw, 0)
 
     def get_mouse_position_vbox(self):
-        # todo: not working
-        x = self.session.console.mouse_pointer_shape.hot_x()
-        y = self.session.console.mouse_pointer_shape.hot_y()
+        x = self.session.console.mouse.pointer_shape.hot_x
+        y = self.session.console.mouse.pointer_shape.hot_y
         return x, y
 
 
@@ -66,10 +71,11 @@ if __name__ == '__main__':
     list = vb.get_vbox_list()
 
     vb.start_vm()
-    vb.mouse_click_vbox(10, 12)
+    vb.mouse_click_vbox(50, 50)
     x, y = vb.get_mouse_position_vbox()
     print(x, y)
 
-    # vb.mouse_move_vbox(1,1)
+    vb.mouse_move_vbox(1,1)
     # vb.mouse_click_vbox(1,1)
-    # vb.get_screenshot_vbox()
+    vb.get_screenshot_vbox()
+    h, w = 1280, 720

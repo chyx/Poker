@@ -24,6 +24,11 @@ class Table(object):
         self.load_coordinates()
         self.logger = logging.getLogger('table')
         self.logger.setLevel(logging.DEBUG)
+
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(handler)
+
         self.gui_signals = gui_signals
         self.game_logger = game_logger
 
@@ -50,6 +55,7 @@ class Table(object):
                     # cv2.threshold(self.cardImages[x + y], 128, 255,
                     # cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                 else:
+                    print("Card template File not found: " + str(x) + str(y) + ".png")
                     self.logger.critical("Card template File not found: " + str(x) + str(y) + ".png")
 
         name = "pics/" + self.tbl[0:2] + "/button.png"

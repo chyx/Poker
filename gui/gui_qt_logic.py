@@ -69,7 +69,12 @@ class UIActionAndSignals(QObject):
     signal_open_setup = QtCore.pyqtSignal(object, object)
 
     def __init__(self, ui_main_window):
+
         self.logger = logging.getLogger('gui')
+
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(handler)
 
         l = GameLogger()
         l.clean_database()
@@ -599,7 +604,7 @@ class FundsPlotter(FigureCanvas):
         data = np.cumsum(data)
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(False)  # discards the old graph
+        # self.axes.hold(False)  # discards the old graph
         self.axes.set_title('My Funds')
         self.axes.set_xlabel('Time')
         self.axes.set_ylabel('$')
@@ -618,7 +623,7 @@ class BarPlotter(FigureCanvas):
 
     def drawfigure(self, l, strategy):
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(True)  # discards the old graph
+        #self.axes.hold(True)  # discards the old graph
 
         data = l.get_stacked_bar_data('Template', strategy, 'stackedBar')
 
@@ -689,7 +694,7 @@ class BarPlotter2(FigureCanvas):
     def drawfigure(self, l, strategy):
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(True)  # discards the old graph
+        #self.axes.hold(True)  # discards the old graph
 
         p_name = str(strategy)
         data = l.get_stacked_bar_data('Template', p_name, 'stackedBar')
@@ -767,7 +772,7 @@ class HistogramEquityWinLoss(FigureCanvas):
 
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(True)  # discards the old graph
+        #self.axes.hold(True)  # discards the old graph
         self.axes.set_title('Histogram')
         self.axes.set_xlabel('Equity')
         self.axes.set_ylabel('Number of hands')
@@ -789,7 +794,7 @@ class PiePlotter(FigureCanvas):
     def drawfigure(self, winnerCardTypeList):
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(False)
+        #self.axes.hold(False)
         self.axes.pie([float(v) for v in winnerCardTypeList.values()],
                       labels=[k for k in winnerCardTypeList.keys()], autopct=None)
         self.axes.set_title('Winning probabilities')
@@ -809,7 +814,7 @@ class CurvePlot(FigureCanvas):
 
     def drawfigure(self):
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(True)  # discards the old graph
+        #self.axes.hold(True)  # discards the old graph
 
         self.axes.axis((0, 1, 0, 1))
         self.axes.set_title('Maximum bet')
@@ -879,7 +884,7 @@ class FundsChangePlot(FigureCanvas):
         data = L.get_fundschange_chart(p_name)
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(False)  # discards the old graph
+        #self.axes.hold(False)  # discards the old graph
         self.axes.set_title('My Funds')
         self.axes.set_xlabel('Time')
         self.axes.set_ylabel('$')
@@ -900,7 +905,7 @@ class ScatterPlot(FigureCanvas):
         wins, losses = l.get_scatterplot_data('Template', p_name, game_stage, decision)
         self.fig.clf()
         self.axes = self.fig.add_subplot(111)  # create an axis
-        self.axes.hold(True)
+        #self.axes.hold(True)
         self.axes.set_title('Wins and Losses')
         self.axes.set_xlabel('Equity')
         self.axes.set_ylabel('Minimum required call')
