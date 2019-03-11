@@ -60,7 +60,8 @@ class UpdateChecker():
     def get_preflop_sheet_url(self):
         cursor = self.mongodb.internal.find()
         c = cursor.next()
-        self.preflop_url = c['preflop_url']
+        # self.preflop_url = c['preflop_url']
+        self.preflop_url = 'decisionmaker/preflop.xlsx'
         self.preflop_url_backup='decisionmaker/preflop.xlsx'
         return self.preflop_url, self.preflop_url_backup
 
@@ -71,8 +72,9 @@ class StrategyHandler(object):
         self.mongodb = self.mongoclient.POKER
 
     def get_playable_strategy_list(self):
-        l = list(self.mongodb.strategies.distinct("Strategy"))[::-1]
-        return l
+        # l = list(self.mongodb.strategies.distinct("Strategy"))[::-1]
+        # return l
+        return ['PS2']
 
     def check_defaults(self):
         if not 'initialFunds2' in self.selected_strategy: self.selected_strategy['initialFunds2'] =  self.selected_strategy['initialFunds']
@@ -129,17 +131,26 @@ class StrategyHandler(object):
         if not 'range_multiple_players' in self.selected_strategy: self.selected_strategy[
             'range_multiple_players'] = 0.2
         if not 'minimum_bet_size' in self.selected_strategy: self.selected_strategy['minimum_bet_size'] = 3
+        if not 'pokerSite' in self.selected_strategy:
+            self.selected_strategy['pokerSite'] = 'PS2'
+        # todo: fix the value!
+        self.selected_strategy['bigBlind'] = 100
+        self.selected_strategy['smallBlind'] = 50
+        self.selected_strategy['considerLastGames'] = 1
+        self.selected_strategy['strategyIterationGames'] = 10
+        self.selected_strategy['gather_player_names'] = 1
 
     def read_strategy(self, strategy_override=''):
         config = ConfigObj("config.ini")
         last_strategy = (config['last_strategy'])
         self.current_strategy = last_strategy if strategy_override == '' else strategy_override
-        try:
-            cursor = self.mongodb.strategies.find({'Strategy': self.current_strategy})
-            self.selected_strategy = cursor.next()
-        except:
-            cursor = self.mongodb.strategies.find({'Strategy': "Default"})
-            self.selected_strategy = cursor.next()
+        # try:
+        #     cursor = self.mongodb.strategies.find({'Strategy': self.current_strategy})
+        #     self.selected_strategy = cursor.next()
+        # except:
+        #     cursor = self.mongodb.strategies.find({'Strategy': "Default"})
+        #     self.selected_strategy = cursor.next()
+        self.selected_strategy = {}
         self.check_defaults()
         return self.selected_strategy
 

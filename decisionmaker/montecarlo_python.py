@@ -524,9 +524,11 @@ def run_montecarlo_wrapper(p, ui_action_and_signals, config, ui, t, L, preflop_s
         m.collusion_cards = ''
 
     if t.gameStage == "PreFlop":
-        maxRuns = 1000
+        # maxRuns = 1000
+        maxRuns = 100
     else:
-        maxRuns = 7500
+        # maxRuns = 7500
+        maxRuns = 100
 
     if t.gameStage != 'PreFlop':
         try:

@@ -8,17 +8,15 @@ from configobj import ConfigObj
 import pymouse
 from captcha.key_press_vbox import *
 from tools.vbox_manager import VirtualBoxController
+from autologging import logged, traced
 
 
+@traced
+@logged
 class MouseMover(VirtualBoxController):
     def __init__(self, vbox_mode):
-        self.logger = logging.getLogger('mouse')
-        self.logger.setLevel(logging.DEBUG)
-
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.DEBUG)
-        self.logger.addHandler(handler)
-
+        # self.__log = logging.getLogger('mouse')
+        # self.__log.setLevel(logging.DEBUG)
         if vbox_mode:
             super().__init__()
         self.mouse=pymouse.PyMouse()
@@ -88,14 +86,16 @@ class MouseMover(VirtualBoxController):
         time.sleep(np.random.uniform(0.1, 0.2, 1)[0])
 
         self.click(x2 + xrand, y2 + yrand)
-        self.logger.debug("Clicked: {0} {1}".format(x2 + xrand, y2 + yrand))
+        self.__log.debug("Clicked: {0} {1}".format(x2 + xrand, y2 + yrand))
 
         time.sleep(np.random.uniform(0.1, 0.5, 1)[0])
 
+@traced
+@logged
 class MouseMoverTableBased(MouseMover):
     def __init__(self, pokersite):
         config = ConfigObj("config.ini")
-        self.logger = logging.getLogger('mouse')
+        # self.__log = logging.getLogger('mouse')
 
 
         try:
@@ -127,26 +127,26 @@ class MouseMoverTableBased(MouseMover):
         y1 = 10 if y1 > 1000 else y1
 
         try:
-            self.logger.debug("Moving mouse away: "+str(x1)+","+str(y1)+","+str(x2)+","+str(y2))
+            self.__log.debug("Moving mouse away: "+str(x1)+","+str(y1)+","+str(x2)+","+str(y2))
             self.mouse_mover(x1, y1, x2, y2)
         except Exception as e:
-            self.logger.warning("Moving mouse away failed")
+            self.__log.warning("Moving mouse away failed")
 
     def move_mouse_away_from_buttons_jump(self):
         x2 = int(np.round(np.random.uniform(1700, 2000, 1), 0)[0])
         y2 = int(np.round(np.random.uniform(10, 200, 1), 0)[0])
 
         try:
-            self.logger.debug("Moving mouse away via jump: "+str(x2)+","+str(y2))
+            self.__log.debug("Moving mouse away via jump: "+str(x2)+","+str(y2))
             if self.vbox_mode:
                 self.mouse_move_vbox(x2, y2)
             else:
                 self.mouse.move(x2, y2)
         except Exception as e:
-            self.logger.warning("Moving mouse via jump away failed"+str(e))
+            self.__log.warning("Moving mouse via jump away failed"+str(e))
 
     def enter_captcha(self, captchaString, topleftcorner):
-        self.logger.warning("Entering Captcha: " + str(captchaString))
+        self.__log.warning("Entering Captcha: " + str(captchaString))
         buttonToleranceX = 30
         buttonToleranceY = 0
         tlx = topleftcorner[0]
@@ -162,7 +162,7 @@ class MouseMoverTableBased(MouseMover):
         try:
             write_characters_to_virtualbox(captchaString, "win")
         except:
-            self.logger.info("Captcha Error")
+            self.__log.info("Captcha Error")
 
     def mouse_action(self, decision, topleftcorner):
         if decision == 'Check Deception': decision = 'Check'
@@ -171,11 +171,11 @@ class MouseMoverTableBased(MouseMover):
         tlx = int(topleftcorner[0])
         tly = int(topleftcorner[1])
 
-        self.logger.info("Mouse moving to: "+decision)
+        self.__log.info("Mouse moving to: "+decision)
         for action in self.coo[decision]:
             for i in range (int(action[0])):
                 time.sleep(np.random.uniform(0, action[1], 1)[0])
-                self.logger.debug("Mouse action:"+str(action))
+                self.__log.debug("Mouse action:"+str(action))
                 if not self.vbox_mode:
                     (x1, y1) = self.mouse.position()
                 else:
