@@ -190,6 +190,6 @@ class MouseMoverTableBased(MouseMover):
 
 if __name__=="__main__":
     logger = logging.getLogger()
-    m=MouseMoverTableBased('PP',5,5)
+    m=MouseMoverTableBased('PP')
     topleftcorner=[22,22]
     m.mouse_action(logger, topleftcorner)

@@ -1,18 +1,323 @@
+
+from PIL import Image, ImageFilter
+from configobj import ConfigObj
+from decisionmaker.genetic_algorithm import GeneticAlgorithm
+from tools.vbox_manager import VirtualBoxController
+from tools.mouse_mover import MouseMoverTableBased
+from decisionmaker.montecarlo_python import MonteCarlo
+
+import common
+import cv2
+import json
+import pandas
+import logging
+import numpy as np
 import os.path
+import pyscreenshot as ImageGrab
+import pytesseract
 import re
 import sys
 import time
-import logging
 
-import cv2  # opencv 3.0
-import numpy as np
-import pytesseract
-from PIL import Image, ImageFilter
-import pyscreenshot as ImageGrab
-from configobj import ConfigObj
+def get_utg_from_abs_pos(abs_pos, dealer_pos):
+  utg_pos = (abs_pos - dealer_pos + 4) % 6
+  return utg_pos
 
-from decisionmaker.genetic_algorithm import GeneticAlgorithm
-from tools.vbox_manager import VirtualBoxController
+def get_abs_from_utg_pos(utg_pos, dealer_pos):
+  abs_pos = (utg_pos + dealer_pos - 4) % 6
+  return abs_pos
+
+
+class NewTable(): 
+  def __init__(self, bot):
+    with open('coords.json') as json_file:  
+      self.coords = json.load(json_file)
+    self.fakeScreenFilename = 'config_gen/table2.png'
+    self.bot = bot
+
+  def TakeFakeScreenshot(self):
+    self.screen = common.GetCvImage(self.fakeScreenFilename)
+
+  def TakeScreenshot(self):
+    try:
+      vb = VirtualBoxController()
+      self.screen = cv2.cvtColor(np.array(vb.get_screenshot_vbox()), cv2.COLOR_BGR2RGB)
+      self.logger.debug("Screenshot taken from virtual machine")
+    except:
+      self.logger.warning("No virtual machine found. Press SETUP to re initialize the VM controller")
+
+  def FindTemplate(self, template, threshold=0.1):
+    self.TakeFakeScreenshot()
+    return common.FindTemplate(self.screen, template, threshold)
+
+  def GetTopLeftCorner(self):
+    self.topLeftPos = self.FindTemplate(self.topLeftPattern)
+
+  def CheckButton(self):
+    num_points, _, _, _ = common.FindTemplateOnScreen(self.buttonPattern, self.screen, 0.01)
+    if num_points < 3: 
+      common.RaiseTemplateNotFound('button', self.buttonPattern, self.screen)
+
+  def CheckCheckButton(self):
+    try:
+      self.FindTemplate(self.checkPattern)
+      self.checkButton = True
+      self.currentCallValue = 0.0
+    except:
+      self.checkButton = False
+
+  def CheckCall(self):
+    try:
+      self.FindTemplate(self.callPattern)
+      self.callButton = True
+    except:
+      self.callButton = False
+
+  def CheckBetbutton(self):
+    try:
+      self.FindTemplate(self.betRadioPattern)
+      self.bet_button_found = True
+    except:
+      self.bet_button_found = False
+
+  def LoadCards(self, tableType):
+    self.card_images = dict()
+    card_values = "23456789TJQKA" 
+    card_suites = "CDHS"
+    for x in card_values:
+      for y in card_suites:
+        name = "pics/%s/%s%s.png" % (tableType, x, y)
+        if not os.path.exists(name):
+          self.logger.critical("Card template File not found: " + name)
+        self.card_images[x + y.upper()] = common.GetCvImage(name)
+
+    self.topLeftPattern = common.GetCvImage('pics/%s/topleft.png' % tableType)
+    self.buttonPattern = common.GetCvImage('pics/%s/button.png' % tableType)
+    self.checkPattern = common.GetCvImage('pics/%s/check.png' % tableType)
+    self.callPattern = common.GetCvImage('pics/%s/call.png' % tableType)
+    self.betRadioPattern = common.GetCvImage('pics/%s/betradio.png' % tableType)
+    self.dealerPattern = common.GetCvImage('pics/%s/dealer.png' % tableType)
+    self.coveredCardPattern = common.GetCvImage('pics/%s/coveredcard.png' % tableType)
+
+  def GetTableCards(self):
+    coord = self.coords['TableCards']
+    table_image = self.screen[
+        (self.topLeftPos[1] + coord['y1']) : (self.topLeftPos[1] + coord['y2']),
+        (self.topLeftPos[0] + coord['x1']) : (self.topLeftPos[0] + coord['x2'])]
+    # common.RaiseTemplateNotFound('', table_image, self.screen)
+
+    self.cardsOnTable = []
+    for key, card_image in self.card_images.items():
+      res = cv2.matchTemplate(table_image, card_image, cv2.TM_SQDIFF_NORMED)
+      min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+      if min_val < 0.01:
+        self.cardsOnTable.append(key)
+
+    self.gameStage = ''
+    if len(self.cardsOnTable) < 1:
+      self.gameStage = "PreFlop"
+    elif len(self.cardsOnTable) == 3:
+      self.gameStage = "Flop"
+    elif len(self.cardsOnTable) == 4:
+      self.gameStage = "Turn"
+    elif len(self.cardsOnTable) == 5:
+      self.gameStage = "River"
+
+    if self.gameStage == '':
+      self.logger.critical("Table cards not recognised correctly: " + str(len(self.cardsOnTable)))
+      self.gameStage = "River"
+    return self.cardsOnTable
+
+
+  def GetDealerPosition(self):
+    x, y = self.FindTemplate(self.dealerPattern, 0.01)
+    x, y = x - self.topLeftPos[0], y - self.topLeftPos[1]
+    coords = self.coords['Dealer']
+    self.position_utg_plus = ''
+    for n, rect in enumerate(coords, start=0):
+      if x > rect['x1'] and y > rect['y1'] and x < rect['x2'] and y < rect['y2']:
+        self.position_utg_plus = n
+        self.dealer_position = (n + 3) % 6  # 0 is myself, 1 is player to the left
+
+    if self.position_utg_plus == '':
+      raise Exception('Dealer not found')
+
+    self.big_blind_position_abs_all = (self.dealer_position + 2) % 6  # 0 is myself, 1 is player to my left
+    self.big_blind_position_abs_op = self.big_blind_position_abs_all - 1
+    return self.dealer_position
+
+  def GetMyCards(self):
+    coord = self.coords['MyCards']
+    table_image = self.screen[
+        (self.topLeftPos[1] + coord['y1']) : (self.topLeftPos[1] + coord['y2']),
+        (self.topLeftPos[0] + coord['x1']) : (self.topLeftPos[0] + coord['x2'])]
+    self.mycards = []
+    for key, card_image in self.card_images.items():
+      res = cv2.matchTemplate(table_image, card_image, cv2.TM_SQDIFF_NORMED)
+      min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+      if min_val < 0.01:
+        self.mycards.append(key)
+    return self.mycards
+
+  def checkFastFold(self, preflop_sheet, mouse):
+    m = MonteCarlo()
+    crd1, crd2 = m.get_two_short_notation(self.mycards)
+    crd1 = crd1.upper()
+    crd2 = crd2.upper()
+    sheet_name = str(self.position_utg_plus + 1)
+    if sheet_name == '6': return True
+
+    sheet = preflop_sheet[sheet_name]
+    sheet['Hand'] = sheet['Hand'].apply(lambda x: str(x).upper())
+    handlist = set(sheet['Hand'].tolist())
+
+    found_card = ''
+
+    if crd1 in handlist:
+      found_card = crd1
+    elif crd2 in handlist:
+      found_card = crd2
+    elif crd1[0:2] in handlist:
+      found_card = crd1[0:2]
+
+    if found_card == '':
+      self.bot.Fold()
+      return False
+    return True
+
+  def InitGetOtherPlayersInfo(self):
+    other_player = {}
+    other_player['utg_position'] = ''
+    other_player['name'] = ''
+    other_player['status'] = ''
+    other_player['funds'] = ''
+    other_player['pot'] = ''
+    other_player['decision'] = ''
+    self.other_players = []
+    for i in range(5):
+      op = other_player.copy()
+      op['abs_position'] = i
+      self.other_players.append(op)
+
+  def Crop(self, coord):
+    return self.screen[
+        (self.topLeftPos[1] + coord['y1']) : (self.topLeftPos[1] + coord['y2']),
+        (self.topLeftPos[0] + coord['x1']) : (self.topLeftPos[0] + coord['x2'])]
+
+  def GetOtherPlayerNames(self):
+    for i in range(5):
+      coord = self.coords['PlayerName'][i]
+
+      player_image_raw = Image.fromarray(self.Crop(coord))
+      basewidth = 500
+      wpercent = basewidth / float(player_image_raw.size[0])
+      hsize = int((float(player_image_raw.size[1]) * float(wpercent)))
+
+      player_image = player_image_raw.resize((basewidth, hsize), Image.ANTIALIAS)
+      player_image.save('pics/player_name%s.png' % i)
+
+      try:
+        recognizedText = pytesseract.image_to_string(player_image)
+        recognizedText = re.sub(r'[\W+]', '', recognizedText)
+        self.other_players[i]['name'] = recognizedText
+      except Exception as e:
+        self.logger.debug("Pyteseract error in player name recognition: " + str(e))
+    return [player['name'] for player in self.other_players]
+
+  def GetOtherPlayerFunds(self):
+    for i in range(5):
+      coord = self.coords['PlayerFund'][i]
+      player_fund = Image.fromarray(self.Crop(coord))
+      value = common.GetOcrFloat(player_fund, 'player_fund%s' % i)
+      value = float(value) if value != '' else ''
+      self.other_players[i]['funds'] = value
+    return [player['funds'] for player in self.other_players]
+
+  def GetOtherPlayerPots(self):
+    for i in range(5):
+      coord = self.coords['PlayerPot'][i]
+      player_pot = Image.fromarray(self.Crop(coord))
+      value = common.GetOcrFloat(player_pot, 'player_pot%s' % i)
+      value = float(value) if value != '' else ''
+      self.other_players[i]['pot'] = value
+    return [player['pot'] for player in self.other_players]
+
+  def GetBotPot(self):
+    coord = self.coords['PlayerPot'][5]
+    player_pot = Image.fromarray(self.Crop(coord))
+    value = common.GetOcrFloat(player_pot, 'player_pot%s' % i)
+    value = float(value) if value != '' else ''
+    self.bot_pot = value
+    return value
+
+  def Debug(self, message):
+    print(message)
+
+  def get_raisers_and_callers(self, reference_pot, small_blind, big_blind):
+    first_raiser = np.nan
+    second_raiser = np.nan
+    first_caller = np.nan
+
+    for n in range(5):  # n is absolute position of other player, 0 is player after bot
+      # less myself as 0 is now first other player to my left and no longer myself
+      i = (self.dealer_position + n + 3 - 2) % 5
+      self.Debug("Go through pots to find raiser abs: {0} {1}".format(i, self.other_players[i]['pot']))
+      if self.other_players[i]['pot'] != '':  # check if not empty (otherwise can't convert string)
+          if self.other_players[i]['pot'] > reference_pot:
+              # reference pot is bb for first round and bot for second round
+              if np.isnan(first_raiser):
+                  first_raiser = int(i)
+                  first_raiser_pot = self.other_players[i]['pot']
+              else:
+                  if self.other_players[i]['pot'] > first_raiser_pot:
+                      second_raiser = int(i)
+
+    first_raiser_utg = get_utg_from_abs_pos(first_raiser, self.dealer_position)
+    highest_raiser = np.nanmax([first_raiser, second_raiser])
+    second_raiser_utg = get_utg_from_abs_pos(second_raiser, self.dealer_position)
+
+    first_possible_caller = int(self.big_blind_position_abs_op + 1) if np.isnan(highest_raiser) else int(
+        highest_raiser + 1)
+    self.Debug("First possible potential caller is: " + str(first_possible_caller))
+
+    # get first caller after raise in preflop
+    for n in range(first_possible_caller, 5):  # n is absolute position of other player, 0 is player after bot
+        self.Debug(
+            "Go through pots to find caller abs: " + str(n) + ": " + str(self.other_players[n]['pot']))
+        if self.other_players[n]['pot'] != '':  # check if not empty (otherwise can't convert string)
+            if (self.other_players[n]['pot'] == big_blind and not n == self.big_blind_position_abs_op) or \
+                            self.other_players[n]['pot'] > big_blind:
+                first_caller = int(n)
+                break
+
+    first_caller_utg = get_utg_from_abs_pos(first_caller, self.dealer_position)
+
+    # check for callers between bot and first raiser. If so, first raiser becomes second raiser and caller becomes first raiser
+    first_possible_caller = 0
+    if self.position_utg_plus == 3: first_possible_caller = 1
+    if self.position_utg_plus == 4: first_possible_caller = 2
+    if not np.isnan(first_raiser):
+        for n in range(first_possible_caller, first_raiser):
+            if self.other_players[n]['status'] == 1 and \
+                    not (self.other_players[n]['utg_position'] == 5) and \
+                    not (self.other_players[n]['utg_position'] == 4) and \
+                    not (self.other_players[n]['pot'] == ''):
+                second_raiser = first_raiser
+                first_raiser = n
+                first_raiser_utg = get_utg_from_abs_pos(first_raiser, self.dealer_position)
+                second_raiser_utg = get_utg_from_abs_pos(second_raiser, self.dealer_position)
+                break
+
+    self.Debug("First raiser abs: " + str(first_raiser))
+    self.Debug("Second raiser abs: " + str(second_raiser))
+    self.Debug("First caller abs: " + str(first_caller))
+
+    return first_raiser, second_raiser, first_caller, first_raiser_utg, second_raiser_utg, first_caller_utg
+
+
+class Bot:
+  def Fold(self):
+    print('me: folds')
 
 
 class Table(object):
@@ -32,7 +337,66 @@ class Table(object):
         self.gui_signals = gui_signals
         self.game_logger = game_logger
 
-    def load_templates(self, p):
+
+# mouse = MouseMoverTableBased(tableType)
+
+tableType = 'PS'
+self = NewTable(Bot())
+self.LoadCards(tableType)
+self.fakeScreenFilename = 'config_gen/table.png'
+self.TakeFakeScreenshot()
+self.GetTopLeftCorner()
+self.GetTableCards()
+self.GetDealerPosition()
+self.GetMyCards()
+preflop_sheet = pandas.read_excel('decisionmaker/preflop.xlsx', sheetname=None)
+self.InitGetOtherPlayersInfo()
+self.GetOtherPlayerNames()
+self.GetOtherPlayerFunds()
+self.GetOtherPlayerPots()
+
+i = 0
+
+  def GetOtherPlayerStatus(self, history, small_blind, big_blind):
+    self.covered_players = 0
+    for i in range(5):
+      coord = self.coords['PlayerStatus'][i]
+      try:
+        common.FindTemplate(self.coveredCardPattern, self.Crop(coord), 0.01)
+        self.covered_players += 1
+        self.other_players[i]['status'] = 1
+      except:
+        self.other_players[i]['status'] = 0
+
+      self.other_players[i]['utg_position'] = get_utg_from_abs_pos(
+          self.other_players[i]['abs_position'], self.dealer_position)
+    self.other_active_players = sum([v['status'] for v in
+      self.other_players[0:5]])
+
+    if self.gameStage == "PreFlop":
+      self.playersBehind = sum(
+          [v['status'] for v in self.other_players if v['abs_position'] >= self.dealer_position + 3 - 1])
+    else:
+      self.playersBehind = sum(
+          [v['status'] for v in self.other_players if v['abs_position'] >= self.dealer_position + 1 - 1])
+    self.playersAhead = self.other_active_players - self.playersBehind
+    self.isHeadsUp = True if self.other_active_players < 2 else False
+
+    if history.round_number == 0:
+      reference_pot = big_blind
+    else:
+      reference_pot = self.GetBotPot(p)
+
+    # get first raiser in (tested for preflop)
+    self.first_raiser, \
+    self.second_raiser, \
+    self.first_caller, \
+    self.first_raiser_utg, \
+    self.second_raiser_utg, \
+    self.first_caller_utg = \
+        self.get_raisers_and_callers(reference_pot, small_blind, big_blind)
+
+    def load_templates_deprecated(self, p):
         self.cardImages = dict()
         self.img = dict()
         self.tbl = p.selected_strategy['pokerSite']
@@ -120,6 +484,14 @@ class Table(object):
             c = eval(inf.read())
             self.coo = c['screen_scraping']
 
+    def TakeScreenshot():
+      try:
+        vb = VirtualBoxController()
+        self.screen = cv2.cvtColor(np.array(vb.get_screenshot_vbox()), cv2.COLOR_BGR2RGB)
+        self.logger.debug("Screenshot taken from virtual machine")
+      except:
+        self.logger.warning("No virtual machine found. Press SETUP to re initialize the VM controller")
+
     def take_screenshot(self, initial, p):
         if initial:
             self.gui_signals.signal_status.emit("")
@@ -151,20 +523,20 @@ class Table(object):
         return True
 
     def find_template_on_screen(self, template, screenshot, threshold):
-        # 'cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        # 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
-        method = eval('cv2.TM_SQDIFF_NORMED')
-        # Apply template Matching
-        res = cv2.matchTemplate(screenshot, template, method)
+        # 'cv2.tm_ccoeff', 'cv2.tm_ccoeff_normed', 'cv2.tm_ccorr',
+        # 'cv2.tm_ccorr_normed', 'cv2.tm_sqdiff', 'cv2.tm_sqdiff_normed']
+        method = eval('cv2.tm_sqdiff_normed')
+        # apply template matching
+        res = cv2.matchtemplate(screenshot, template, method)
         loc = np.where(res <= threshold)
 
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+        min_val, max_val, min_loc, max_loc = cv2.minmaxloc(res)
 
-        # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
-        if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
-            bestFit = min_loc
+        # if the method is tm_sqdiff or tm_sqdiff_normed, take minimum
+        if method in [cv2.tm_sqdiff, cv2.tm_sqdiff_normed]:
+            bestfit = min_loc
         else:
-            bestFit = max_loc
+            bestfit = max_loc
 
         count = 0
         points = []
@@ -176,7 +548,7 @@ class Table(object):
         # plt.subplot(122),plt.imshow(img,cmap = 'jet')
         # plt.imshow(img, cmap = 'gray', interpolation = 'bicubic')
         # plt.show()
-        return count, points, bestFit, min_val
+        return count, points, bestfit, min_val
 
     def get_ocr_float(self, img_orig, name, force_method=0, binarize=False):
         def binarize_array(image, threshold=200):
@@ -332,78 +704,6 @@ class Table(object):
         # cropped_example.show()
         return cropped_example
 
-    def get_utg_from_abs_pos(self, abs_pos, dealer_pos):
-        utg_pos = (abs_pos - dealer_pos + 4) % 6
-        return utg_pos
-
-    def get_abs_from_utg_pos(self, utg_pos, dealer_pos):
-        abs_pos = (utg_pos + dealer_pos - 4) % 6
-        return abs_pos
-
-    def get_raisers_and_callers(self, p, reference_pot):
-        first_raiser = np.nan
-        second_raiser = np.nan
-        first_caller = np.nan
-
-        for n in range(5):  # n is absolute position of other player, 0 is player after bot
-            i = (
-                    self.dealer_position + n + 3 - 2) % 5  # less myself as 0 is now first other player to my left and no longer myself
-            self.logger.debug("Go through pots to find raiser abs: {0} {1}".format(i, self.other_players[i]['pot']))
-            if self.other_players[i]['pot'] != '':  # check if not empty (otherwise can't convert string)
-                if self.other_players[i]['pot'] > reference_pot:
-                    # reference pot is bb for first round and bot for second round
-                    if np.isnan(first_raiser):
-                        first_raiser = int(i)
-                        first_raiser_pot = self.other_players[i]['pot']
-                    else:
-                        if self.other_players[i]['pot'] > first_raiser_pot:
-                            second_raiser = int(i)
-
-        first_raiser_utg = self.get_utg_from_abs_pos(first_raiser, self.dealer_position)
-        highest_raiser = np.nanmax([first_raiser, second_raiser])
-        second_raiser_utg = self.get_utg_from_abs_pos(second_raiser, self.dealer_position)
-
-        first_possible_caller = int(self.big_blind_position_abs_op + 1) if np.isnan(highest_raiser) else int(
-            highest_raiser + 1)
-        self.logger.debug("First possible potential caller is: " + str(first_possible_caller))
-
-        # get first caller after raise in preflop
-        for n in range(first_possible_caller, 5):  # n is absolute position of other player, 0 is player after bot
-            self.logger.debug(
-                "Go through pots to find caller abs: " + str(n) + ": " + str(self.other_players[n]['pot']))
-            if self.other_players[n]['pot'] != '':  # check if not empty (otherwise can't convert string)
-                if (self.other_players[n]['pot'] == float(
-                        p.selected_strategy['bigBlind']) and not n == self.big_blind_position_abs_op) or \
-                                self.other_players[n]['pot'] > float(p.selected_strategy['bigBlind']):
-                    first_caller = int(n)
-                    break
-
-        first_caller_utg = self.get_utg_from_abs_pos(first_caller, self.dealer_position)
-
-        # check for callers between bot and first raiser. If so, first raiser becomes second raiser and caller becomes first raiser
-        first_possible_caller = 0
-        if self.position_utg_plus == 3: first_possible_caller = 1
-        if self.position_utg_plus == 4: first_possible_caller = 2
-        if not np.isnan(first_raiser):
-            for n in range(first_possible_caller, first_raiser):
-                if self.other_players[n]['status'] == 1 and \
-                        not (self.other_players[n]['utg_position'] == 5 and p.selected_strategy['bigBlind']) and \
-                        not (self.other_players[n]['utg_position'] == 4 and p.selected_strategy['smallBlind']) and \
-                        not (self.other_players[n]['pot'] == ''):
-                    second_raiser = first_raiser
-                    first_raiser = n
-                    first_raiser_utg = self.get_utg_from_abs_pos(first_raiser, self.dealer_position)
-                    second_raiser_utg = self.get_utg_from_abs_pos(second_raiser, self.dealer_position)
-                    break
-
-        self.logger.debug("First raiser abs: " + str(first_raiser))
-        self.logger.info("First raiser utg+" + str(first_raiser_utg))
-        self.logger.debug("Second raiser abs: " + str(second_raiser))
-        self.logger.info("Highest raiser abs: " + str(highest_raiser))
-        self.logger.debug("First caller abs: " + str(first_caller))
-        self.logger.info("First caller utg+" + str(first_caller_utg))
-
-        return first_raiser, second_raiser, first_caller, first_raiser_utg, second_raiser_utg, first_caller_utg
 
     def derive_preflop_sheet_name(self, t, h, first_raiser_utg, first_caller_utg, second_raiser_utg):
         first_raiser_string = 'R' if not np.isnan(first_raiser_utg) else ''

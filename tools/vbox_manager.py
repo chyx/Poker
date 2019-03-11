@@ -11,8 +11,8 @@ import logging
 
 class VirtualBoxController(virtualbox.library.IMouse):
     def __init__(self):
-        self.logger = logging.getLogger('vm_control')
-        # self.logger = logging.getLogger()
+        # self.logger = logging.getLogger('vm_control')
+        self.logger = logging.getLogger()
 
         handler = logging.StreamHandler(sys.stdout)
         handler.setLevel(logging.DEBUG)
